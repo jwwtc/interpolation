@@ -37,8 +37,8 @@ DOM_X      = (0.0, 1.0e-3)  # m
 DOM_Y      = (0.0, 1.0e-3)
 DOM_Z      = (0.0, 4.0e-4)
 
-MAX_LAYERS = 3              # per fine voxel
-MAX_EVENTS = 2              # per layer
+MAX_LAYERS = 3              # keep this voxel's layer plus two layers above
+MAX_EVENTS = 2              # earliest events kept per layer
 DWELL_DT   = 5.0            # s  → layer split gap
 COORD_PREC = 10             # decimals for coordinates
 # ───────────────────────────────────────────────────────────────────────────
@@ -134,8 +134,9 @@ def main():
     fine_rows, dropped = [], 0
     for lst in tqdm(vox.values(), total=len(vox)):
         before = len(lst)
-        fine_rows.extend(clean_voxel(lst))
-        dropped += before - len(clean_voxel(lst))
+        cleaned = clean_voxel(lst)
+        fine_rows.extend(cleaned)
+        dropped += before - len(cleaned)
 
     print(f"Total events after cleaning: {len(fine_rows):,}")
     print(f"Events dropped by limits:    {dropped:,}")
