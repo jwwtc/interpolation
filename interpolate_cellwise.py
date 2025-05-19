@@ -21,10 +21,19 @@ Change log
 """
 
 from pathlib import Path
-import time, collections
-import numpy as np
-import pandas as pd
-from tqdm import tqdm
+import time
+import collections
+
+try:  # optional heavy deps – only required for main()
+    import numpy as np  # type: ignore
+    import pandas as pd  # type: ignore
+    from tqdm import tqdm  # type: ignore
+except ModuleNotFoundError:  # allow import when deps are missing
+    np = None  # type: ignore
+    pd = None  # type: ignore
+
+    def tqdm(iterable, **kwargs):  # pragma: no cover - fallback
+        return iterable
 
 # ── user settings ──────────────────────────────────────────────────────────
 GEOM_DIR    = Path("data/1x1x04")
@@ -44,7 +53,9 @@ COORD_PREC = 10             # decimals for coordinates
 # ───────────────────────────────────────────────────────────────────────────
 
 
-def load_history(path: Path) -> pd.DataFrame:
+def load_history(path: Path):
+    if pd is None:
+        raise RuntimeError("pandas is required to load history")
     with path.open() as f:
         has_header = f.readline().lower().startswith("x")
     df = pd.read_csv(
@@ -64,13 +75,13 @@ def load_history(path: Path) -> pd.DataFrame:
     return df
 
 
-def make_layers(times: np.ndarray):
+def make_layers(times):
     """Yield index lists whose first–last gap ≤ DWELL_DT (ascending order)."""
     start = 0
     n = len(times)
     while start < n:
         end = start
-        while end + 1 < n and times[end + 1] - times[start] <= DWELL_DT:
+        while end + 1 < n and times[end + 1] - times[start] <= DWELL_DT + 1e-9:
             end += 1
         yield list(range(start, end + 1))
         start = end + 1
@@ -86,7 +97,7 @@ def clean_voxel(events: list) -> list:
       • within each layer keep the earliest MAX_EVENTS hits.
     """
     events.sort(key=lambda e: e["tm"])  # ascending tm
-    times = np.fromiter((e["tm"] for e in events), float)
+    times = [e["tm"] for e in events]
 
     layers = list(make_layers(times))            # earliest → latest
     selected = layers[:MAX_LAYERS] or []
