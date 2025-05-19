@@ -10,14 +10,14 @@ Workflow
 2.  Replicate every coarse 20 µm event to all 64 (4×4×4) fine
     5 µm voxels of its parent cube.
 3.  **For each fine voxel** keep at most
-       MAX_LAYERS (latest layers) × MAX_EVENTS (earliest hits per layer)
-    where layers are separated by DWELL_DT seconds.
+       MAX_LAYERS (its layer plus up to two above) × MAX_EVENTS
+    (earliest hits per layer), with layers split by DWELL_DT seconds.
 4.  Write the cleaned 5 µm file; report tm≤tl overlaps.
 
 Change log
 ----------
-* *clean_voxel* now keeps the **latest** layers so the true build-layers
-  (18 s, 27 s, 36 s …) are preserved.
+* *clean_voxel* now keeps the **earliest** layers so each node accounts for
+  its own layer plus the two layers above.
 """
 
 from pathlib import Path
@@ -37,8 +37,8 @@ DOM_X      = (0.0, 1.0e-3)  # m
 DOM_Y      = (0.0, 1.0e-3)
 DOM_Z      = (0.0, 4.0e-4)
 
-MAX_LAYERS = 3              # per fine voxel
-MAX_EVENTS = 2              # per layer
+MAX_LAYERS = 3              # keep this voxel's layer plus two layers above
+MAX_EVENTS = 2              # earliest events kept per layer
 DWELL_DT   = 5.0            # s  → layer split gap
 COORD_PREC = 10             # decimals for coordinates
 # ───────────────────────────────────────────────────────────────────────────
@@ -82,14 +82,14 @@ def clean_voxel(events: list) -> list:
 
     Strategy:
       • build ALL layers (ascending time),
-      • take the **latest** MAX_LAYERS layers,
-      • within each layer keep the earliest MAX_EVENTS hits.
+      • keep this voxel's layer plus the next two above (earliest layers),
+      • within each retained layer keep the earliest MAX_EVENTS hits.
     """
     events.sort(key=lambda e: e["tm"])  # ascending tm
     times = np.fromiter((e["tm"] for e in events), float)
 
     layers = list(make_layers(times))            # earliest → latest
-    selected = layers[-MAX_LAYERS:] or []
+    selected = layers[:MAX_LAYERS] or []
 
     kept = []
     for idxs in selected:
@@ -134,8 +134,9 @@ def main():
     fine_rows, dropped = [], 0
     for lst in tqdm(vox.values(), total=len(vox)):
         before = len(lst)
-        fine_rows.extend(clean_voxel(lst))
-        dropped += before - len(clean_voxel(lst))
+        cleaned = clean_voxel(lst)
+        fine_rows.extend(cleaned)
+        dropped += before - len(cleaned)
 
     print(f"Total events after cleaning: {len(fine_rows):,}")
     print(f"Events dropped by limits:    {dropped:,}")
