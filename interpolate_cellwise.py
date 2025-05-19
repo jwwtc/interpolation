@@ -10,8 +10,8 @@ Workflow
 2.  Replicate every coarse 20 µm event to all 64 (4×4×4) fine
     5 µm voxels of its parent cube.
 3.  **For each fine voxel** keep at most
-       MAX_LAYERS (its layer plus up to two above) × MAX_EVENTS
-    (earliest hits per layer), with layers split by DWELL_DT seconds.
+       MAX_LAYERS (earliest layers) × MAX_EVENTS (earliest hits per layer)
+    where layers are separated by DWELL_DT seconds.
 4.  Write the cleaned 5 µm file; report tm≤tl overlaps.
 
 Change log
@@ -82,8 +82,8 @@ def clean_voxel(events: list) -> list:
 
     Strategy:
       • build ALL layers (ascending time),
-      • keep this voxel's layer plus the next two above (earliest layers),
-      • within each retained layer keep the earliest MAX_EVENTS hits.
+      • take the **earliest** MAX_LAYERS layers,
+      • within each layer keep the earliest MAX_EVENTS hits.
     """
     events.sort(key=lambda e: e["tm"])  # ascending tm
     times = np.fromiter((e["tm"] for e in events), float)
